@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>LOG'E RUNNER · Swipe to Run & Jump</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at 20% 30%, #0a0f1e, #03050b);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif;
+      touch-action: pan-x pan-y; /* fallback, canvas will override */
+    }
+
+    .game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    canvas {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 96%;
+      max-height: 96%;
+      object-fit: contain;
+      border-radius: 32px;
+      box-shadow: 0 20px 35px rgba(0,0,0,0.5), 0 0 0 2px rgba(0,229,255,0.3);
+      cursor: pointer;
+      touch-action: none; /* prevent browser scroll while swiping */
+    }
+
+    /* UI stats */
+    #ui {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      right: 18px;
+      display: flex;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      padding: 10px 20px;
+      border-radius: 60px;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: white;
+      border: 1px solid rgba(0, 229, 255, 0.5);
+      z-index: 10;
+      font-family: monospace;
+      pointer-events: none;
+    }
+
+    #ui span {
+      color: #ffd966;
+      text-shadow: 0 0 3px #ff9900;
+    }
+
+    .player-name-badge {
+      background: #0a1a2fcc;
+      padding: 4px 14px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      color: #88ddff;
+    }
+
+    /* LOGIN SCREEN (LOGE ENTRANCE) */
+    .loge-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #0b1120, #010308);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+      transition: all 0.3s ease;
+    }
+
+    .loge-card {
+      background: rgba(15, 25, 45, 0.92);
+      backdrop-filter: blur(18px);
+      border-radius: 3rem;
+      padding: 2rem 2rem 2.5rem;
+      width: 85%;
+      max-width: 400px;
+      text-align: center;
+      border: 1px solid rgba(0, 229, 255, 0.7);
+      box-shadow: 0 30px 50px rgba(0,0,0,0.6);
+      animation: pulseGlow 2s infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 20px 35px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,255,0.4); transform: translateY(0px);}
+      100% { box-shadow: 0 28px 45px rgba(0,0,0,0.7), 0 0 0 3px rgba(0,229,255,0.7); transform: translateY(-5px);}
+    }
+
+    .loge-card h1 {
+      font-size: 2.4rem;
+      background: linear-gradient(135deg, #fff, #4dffea);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .input-group input {
+      background: #0e1a2a;
+      border: 1px solid #2c5270;
+      padding: 14px 20px;
+      border-radius: 60px;
+      font-size: 1rem;
+      color: white;
+      text-align: center;
+      outline: none;
+      width: 100%;
+      margin: 15px 0;
+      font-weight: bold;
+    }
+
+    .start-btn {
+      background: linear-gradient(95deg, #00c3ff, #0077ff);
+      border: none;
+      padding: 14px 0;
+      width: 100%;
+      border-radius: 60px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .start-btn:active { transform: scale(0.96); }
+
+    .highscore-info {
+      margin-top: 1rem;
+      background: #00000066;
+      padding: 8px;
+      border-radius: 60px;
+      color: #ffd966;
+    }
+
+    /* Game over panel */
+    #gameOver {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.94);
+      backdrop-filter: blur(8px);
+      color: white;
+      z-index: 20;
+    }
+
+    .over-card {
+      background: #07121fe6;
+      padding: 1.8rem;
+      border-radius: 48px;
+      text-align: center;
+      border: 1px solid cyan;
+      width: 280px;
+    }
+
+    button {
+      padding: 12px 18px;
+      margin: 8px 6px;
+      border: none;
+      border-radius: 40px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.1s;
+    }
+
+    button:active { transform: scale(0.96); }
+    .restart-btn { background: #4caf50; color: white; }
+    .logout-btn { background: #ff9800; color: #1f1f1f; }
+
+    .swipe-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #bbddffaa;
+      font-size: 12px;
+      background: #00000077;
+      width: fit-content;
+      margin: 0 auto;
+      padding: 6px 14px;
+      border-radius: 40px;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+      font-family: monospace;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="ui">
+    <div>🏃‍♂️ RUN: <span id="score">0</span></div>
+    <div>🪙 COINS: <span id="coins">0</span></div>
+    <div class="player-name-badge" id="playerNameUI">——</div>
+  </div>
+  <div id="gameOver">
+    <div class="over-card">
+      <h1>💀 GAME OVER 💀</h1>
+      <p id="final"></p>
+      <button class="restart-btn" onclick="restartWithSameRunner()">🏁 RUN AGAIN</button>
+      <button class="logout-btn" onclick="showLoginScreen()">🚪 LOG'E OUT</button>
+    </div>
+  </div>
+  <div class="swipe-hint">⬅️ ➡️  switch lanes &nbsp;&nbsp;| &nbsp;&nbsp;⬆️ swipe up to JUMP</div>
+</div>
+
+<!-- LOGE SCREEN (LOGIN) -->
+<div id="logeScreen" class="loge-screen">
+  <div class="loge-card">
+    <h1>⚡ LOG'E RUNNER ⚡</h1>
+    <p>subway style · swipe & dash</p>
+    <div class="input-group">
+      <input type="text" id="runnerName" placeholder="ENTER YOUR NAME" maxlength="16" autocomplete="off" value="SPRINTER">
+    </div>
+    <button class="start-btn" id="enterGameBtn">▶ ENTER THE TRACKS</button>
+    <div class="highscore-info" id="highScorePreview">🏆 BEST: —</div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    // ---------- DOM elements ----------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreSpan = document.getElementById('score');
+    const coinsSpan = document.getElementById('coins');
+    const gameOverDiv = document.getElementById('gameOver');
+    const finalText = document.getElementById('final');
+    const playerNameSpan = document.getElementById('playerNameUI');
+    const logeScreen = document.getElementById('logeScreen');
+    const runnerNameInput = document.getElementById('runnerName');
+    const highScorePreviewSpan = document.getElementById('highScorePreview');
+
+    // ---------- GAME STATE ----------
+    let currentPlayerName = "RUNNER";
+    let running = false;
+    let animationId = null;
+    let spawnInterval = null;
+    let jumpIntervalId = null;      // for smooth jump animation
+    
+    // game entities
+    let player = {
+      lane: 1,          // 0,1,2
+      jumpOffset: 0,
+      isJumping: false,
+      x: 200,
+      targetX: 200,
+      baseY: 480
+    };
+    let obstacles = [];    // { laneIdx, y }
+    let coins = [];        // { laneIdx, y }
+    let score = 0;
+    let coinCount = 0;
+    let currentSpeed = 6;
+    let laneCenters = [];
+    
+    // highscore storage
+    let globalHighScore = 0;
+    let highScoreHolder = "---";
+    
+    // ---------- helper functions ----------
+    function loadHighScores() {
+      try {
+        const stored = localStorage.getItem('logeRunner_highscore');
+        if(stored) {
+          const data = JSON.parse(stored);
+          globalHighScore = data.score || 0;
+          highScoreHolder = data.name || "LEGEND";
+        } else {
+          globalHighScore = 0;
+          highScoreHolder = "NONE";
+        }
+      } catch(e) { globalHighScore = 0; highScoreHolder = "ERROR"; }
+      highScorePreviewSpan.innerText = `🏆 BEST: ${globalHighScore} (${highScoreHolder})`;
+    }
+
+    function saveHighScoreIfNeeded(currentScore, playerName) {
+      if(currentScore > globalHighScore) {
+        globalHighScore = currentScore;
+        highScoreHolder = playerName;
+        localStorage.setItem('logeRunner_highscore', JSON.stringify({ score: globalHighScore, name: highScoreHolder }));
+        highScorePreviewSpan.innerText = `🏆 BEST: ${globalHighScore} (${highScoreHolder})`;
+        return true;
+      }
+      return false;
+    }
+    
+    // dynamic lane positions based on canvas width
+    function updateLaneCenters() {
+      const w = canvas.width;
+      const margin = w * 0.14;      // 14% from edges
+      const trackWidth = w - (margin * 2);
+      const laneWidth = trackWidth / 3;
+      laneCenters = [];
+      for(let i=0; i<3; i++) {
+        laneCenters.push(margin + (i * laneWidth) + (laneWidth/2));
+      }
+      return laneCenters;
+    }
+    
+    function updateBaseY() {
+      player.baseY = canvas.height - 92;
+    }
+    
+    // resize canvas responsively
+    function resizeCanvas() {
+      const container = document.querySelector('.game-container');
+      const maxWidth = Math.min(window.innerWidth - 24, 520);
+      const maxHeight = window.innerHeight - 70;
+      let targetWidth = maxWidth;
+      let targetHeight = (targetWidth * 600) / 400;
+      if(targetHeight > maxHeight) {
+        targetHeight = maxHeight;
+        targetWidth = (targetHeight * 400) / 600;
+      }
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      canvas.style.width = `${targetWidth}px`;
+      canvas.style.height = `${targetHeight}px`;
+      updateLaneCenters();
+      updateBaseY();
+      if(laneCenters.length && running) {
+        player.targetX = laneCenters[player.lane];
+      }
+    }
+    
+    // ---------- CORE MECHANICS ----------
+    function resetGameState() {
+      if(spawnInterval) clearInterval(spawnInterval);
+      if(animationId) cancelAnimationFrame(animationId);
+      if(jumpIntervalId) clearInterval(jumpIntervalId);
+      
+      obstacles = [];
+      coins = [];
+      score = 0;
+      coinCount = 0;
+      currentSpeed = 6;
+      running = false;
+      player.lane = 1;
+      player.jumpOffset = 0;
+      player.isJumping = false;
+      if(laneCenters.length) {
+        player.targetX = laneCenters[1];
+        player.x = laneCenters[1];
+      } else {
+        player.x = canvas.width/2;
+      }
+      scoreSpan.innerText = "0";
+      coinsSpan.innerText = "0";
+    }
+    
+    // collision detection (circle vs square) with jump avoidance
+    function checkCollision(obsY, obsLane, playerLane, playerYground, jumpVal) {
+      if(obsLane !== playerLane) return false;
+      const obsX = laneCenters[obsLane];
+      const obsSize = Math.max(36, canvas.width * 0.09);
+      const halfSize = obsSize/2;
+      const playerRadius = Math.max(22, canvas.width * 0.058);
+      const playerRealY = playerYground - jumpVal;
+      const closestX = Math.max(obsX - halfSize, Math.min(player.x, obsX + halfSize));
+      const closestY = Math.max(obsY, Math.min(playerRealY, obsY + obsSize));
+      const dx = closestX - player.x;
+      const dy = closestY - playerRealY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      return dist < playerRadius;
+    }
+    
+    function collectCoin(coinY, coinLane) {
+      const coinRadius = Math.max(12, canvas.width * 0.032);
+      const playerRadius = Math.max(22, canvas.width * 0.058);
+      const playerRealY = player.baseY - player.jumpOffset;
+      const coinX = laneCenters[coinLane];
+      const dx = player.x - coinX;
+      const dy = playerRealY - coinY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      return dist < (playerRadius + coinRadius);
+    }
+    
+    function gameOver() {
+      if(!running) return;
+      running = false;
+      if(spawnInterval) { clearInterval(spawnInterval); spawnInterval = null; }
+      if(animationId) { cancelAnimationFrame(animationId); animationId = null; }
+      if(jumpIntervalId) { clearInterval(jumpIntervalId); jumpIntervalId = null; }
+      
+      const isNewHigh = saveHighScoreIfNeeded(score, currentPlayerName);
+      finalText.innerHTML = `🏁 ${currentPlayerName}<br>⭐ SCORE: ${score}<br>🪙 COINS: ${coinCount}<br>${isNewHigh ? '✨ NEW RECORD! ✨' : ''}`;
+      gameOverDiv.style.display = "flex";
+    }
+    
+    // Jump function with smooth arc (fixed interval for stable feel)
+    function performJump() {
+      if(!running) return;
+      if(player.isJumping) return;
+      player.isJumping = true;
+      let height = 0;
+      let goingUp = true;
+      if(jumpIntervalId) clearInterval(jumpIntervalId);
+      jumpIntervalId = setInterval(() => {
+        if(!running) {
+          if(jumpIntervalId) clearInterval(jumpIntervalId);
+          return;
+        }
+        if(goingUp) {
+          height += 6.5;
+          if(height >= 82) goingUp = false;
+        } else {
+          height -= 6.5;
+          if(height <= 0) {
+            height = 0;
+            clearInterval(jumpIntervalId);
+            player.isJumping = false;
+            jumpIntervalId = null;
+          }
+        }
+        player.jumpOffset = height;
+      }, 18);
+    }
+    
+    function startSpawning() {
+      if(spawnInterval) clearInterval(spawnInterval);
+      spawnInterval = setInterval(() => {
+        if(!running) return;
+        // obstacle spawn 75%
+        if(Math.random() < 0.78) {
+          obstacles.push({ laneIdx: Math.floor(Math.random()*3), y: -70 });
+        }
+        // coin spawn 70%
+        if(Math.random() < 0.73) {
+          coins.push({ laneIdx: Math.floor(Math.random()*3), y: -100 });
+        }
+      }, 680);
+    }
+    
+    // ---------- GAME LOOP (UPDATE & DRAW) ----------
+    function updateGame() {
+      if(!running) return;
+      
+      // dynamic recalc per frame for responsive layout
+      updateLaneCenters();
+      if(laneCenters.length) {
+        player.targetX = laneCenters[player.lane];
+        // smooth lerp (makes lane switching butter-smooth)
+        player.x += (player.targetX - player.x) * 0.28;
+      }
+      
+      // obstacles update & collision
+      for(let i=0; i<obstacles.length; i++) {
+        obstacles[i].y += currentSpeed;
+        const collides = checkCollision(
+          obstacles[i].y, obstacles[i].laneIdx, player.lane, player.baseY, player.jumpOffset
+        );
+        // if not jumping high enough -> dead
+        if(collides && player.jumpOffset < 22) {
+          gameOver();
+          return;
+        }
+      }
+      obstacles = obstacles.filter(o => o.y < canvas.height + 120);
+      
+      // coins collection
+      for(let i=0; i<coins.length; i++) {
+        coins[i].y += currentSpeed;
+        if(collectCoin(coins[i].y, coins[i].laneIdx)) {
+          coinCount++;
+          coinsSpan.innerText = coinCount;
+          coins.splice(i,1);
+          i--;
+        }
+      }
+      coins = coins.filter(c => c.y < canvas.height + 100);
+      
+      // scoring & difficulty
+      score++;
+      scoreSpan.innerText = score;
+      if(score % 290 === 0 && currentSpeed < 13.5) {
+        currentSpeed += 0.45;
+      }
+      
+      drawScene();
+      animationId = requestAnimationFrame(updateGame);
+    }
+    
+    function drawScene() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // deep subway background
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, "#11161f");
+      grad.addColorStop(1, "#020408");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // track area
+      if(laneCenters.length >= 3) {
+        const leftRail = laneCenters[0] - 34;
+        const rightRail = laneCenters[2] + 34;
+        ctx.fillStyle = "#1a1f2ecc";
+        ctx.fillRect(leftRail, 0, rightRail-leftRail, canvas.height);
+        ctx.fillStyle = "#2a3145";
+        for(let i=0;i<3;i++){
+          ctx.beginPath();
+          ctx.moveTo(laneCenters[i]-14, 0);
+          ctx.lineTo(laneCenters[i]+14, 0);
+          ctx.lineTo(laneCenters[i]+8, canvas.height);
+          ctx.lineTo(laneCenters[i]-8, canvas.height);
+          ctx.fillStyle = "#252c44";
+          ctx.fill();
+        }
+        // glowing lane dividers
+        for(let i=1;i<3;i++){
+          const lineX = (laneCenters[i-1] + laneCenters[i])/2;
+          ctx.beginPath();
+          ctx.strokeStyle = "#00e5ffaa";
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([12, 20]);
+          ctx.moveTo(lineX, 0);
+          ctx.lineTo(lineX, canvas.height);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      
+      // Obstacles (glowing red blocks)
+      for(let o of obstacles){
+        const x = laneCenters[o.laneIdx];
+        const size = Math.max(34, canvas.width * 0.085);
+        ctx.fillStyle = "#ff3366";
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = "#ff1a4f";
+        ctx.fillRect(x - size/2, o.y, size, size);
+        ctx.fillStyle = "#ff8888";
+        ctx.fillRect(x - size/4, o.y+6, size/2, 7);
+      }
+      // Coins (golden shine)
+      for(let c of coins){
+        const x = laneCenters[c.laneIdx];
+        const rad = Math.max(12, canvas.width * 0.038);
+        ctx.beginPath();
+        ctx.arc(x, c.y, rad, 0, Math.PI*2);
+        ctx.fillStyle = "#F5B041";
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x, c.y, rad-3, 0, Math.PI*2);
+        ctx.fillStyle = "#FFD966";
+        ctx.fill();
+        ctx.fillStyle = "#FFAA33";
+        ctx.font = `bold ${rad+3}px monospace`;
+        ctx.fillText("★", x-7, c.y+6);
+      }
+      ctx.shadowBlur = 0;
+      
+      // PLAYER (dynamic runner with neon edge)
+      const pX = player.x;
+      const pYground = player.baseY;
+      const headY = pYground - player.jumpOffset - 12;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#0effff";
+      ctx.fillStyle = "#2affdd";
+      ctx.beginPath();
+      ctx.arc(pX, pYground - player.jumpOffset - 5, 24, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(pX-7, pYground - player.jumpOffset - 13, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(pX+7, pYground - player.jumpOffset - 13, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#001d33";
+      ctx.beginPath();
+      ctx.arc(pX-5, pYground - player.jumpOffset - 14, 2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(pX+5, pYground - player.jumpOffset - 14, 2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#00bbff";
+      ctx.fillRect(pX-14, pYground - player.jumpOffset - 4, 28, 28);
+      ctx.fillStyle = "#005f7a";
+      ctx.fillRect(pX-6, pYground - player.jumpOffset + 8, 12, 16);
+      // shadow below
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(pX, pYground+14, 22, 9, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      // speed lines (kinetic effect)
+      if(currentSpeed > 7.5){
+        ctx.beginPath();
+        for(let i=0;i<6;i++){
+          ctx.moveTo(30+i*45, (Date.now()*0.012)%canvas.height);
+          ctx.lineTo(15+i*37, (Date.now()*0.012+35)%canvas.height);
+          ctx.strokeStyle = `rgba(0,229,255,${0.2+Math.sin(Date.now()*0.008)*0.1})`;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+      }
+    }
+    
+    // ---------- TOUCH CONTROLS (SMOOTH LANE SWIPE + UP SWIPE JUMP) ----------
+    let touchStart = { x: 0, y: 0, time: 0 };
+    
+    function attachSwipeControls() {
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const touch = e.touches[0];
+        touchStart.x = touch.clientX;
+        touchStart.y = touch.clientY;
+        touchStart.time = Date.now();
+      });
+      
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();   // prevent page scroll while swiping on canvas
+      });
+      
+      canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if(!running) return;
+        if(!e.changedTouches.length) return;
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const deltaX = endX - touchStart.x;
+        const deltaY = endY - touchStart.y;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        
+        // Detect vertical swipe UP (jump) if vertical movement dominant and upward
+        if(absY > absX && deltaY < -35 && absY > 40) {
+          performJump();
+          return;
+        }
+        
+        // Horizontal swipe: lane change
+        if(absX > 45) {
+          if(deltaX > 0 && player.lane < 2) {
+            player.lane++;
+          } else if(deltaX < 0 && player.lane > 0) {
+            player.lane--;
+          }
+        }
+      });
+    }
+    
+    // also keep click/tap for mouse jump
+    canvas.addEventListener('click', (e) => {
+      if(!running) return;
+      performJump();
+    });
+    
+    // Keyboard arrow support for desktop
+    window.addEventListener('keydown', (e) => {
+      if(!running) return;
+      if(e.key === 'ArrowLeft' && player.lane > 0) {
+        player.lane--;
+        e.preventDefault();
+      } else if(e.key === 'ArrowRight' && player.lane < 2) {
+        player.lane++;
+        e.preventDefault();
+      } else if(e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Space') {
+        e.preventDefault();
+        performJump();
+      }
+    });
+    
+    // ---------- GAME INIT FROM LOGIN ----------
+    function startGameWithName(playerName) {
+      if(!playerName || playerName.trim() === "") playerName = "LOG'E RUNNER";
+      currentPlayerName = playerName.trim().substring(0, 16);
+      playerNameSpan.innerText = currentPlayerName;
+      resetGameState();
+      resizeCanvas();
+      updateLaneCenters();
+      updateBaseY();
+      player.x = laneCenters[1];
+      player.targetX = laneCenters[1];
+      player.lane = 1;
+      player.jumpOffset = 0;
+      player.isJumping = false;
+      running = true;
+      score = 0;
+      coinCount = 0;
+      currentSpeed = 6;
+      obstacles = [];
+      coins = [];
+      scoreSpan.innerText = "0";
+      coinsSpan.innerText = "0";
+      
+      if(animationId) cancelAnimationFrame(animationId);
+      if(spawnInterval) clearInterval(spawnInterval);
+      if(jumpIntervalId) clearInterval(jumpIntervalId);
+      
+      startSpawning();
+      animationId = requestAnimationFrame(updateGame);
+      gameOverDiv.style.display = "none";
+    }
+    
+    window.restartWithSameRunner = function() {
+      if(!currentPlayerName) currentPlayerName = "RUNNER";
+      startGameWithName(currentPlayerName);
+    };
+    
+    window.showLoginScreen = function() {
+      if(spawnInterval) clearInterval(spawnInterval);
+      if(animationId) cancelAnimationFrame(animationId);
+      if(jumpIntervalId) clearInterval(jumpIntervalId);
+      running = false;
+      gameOverDiv.style.display = "none";
+      logeScreen.style.display = "flex";
+      loadHighScores();
+      // draw idle background
+      ctx.fillStyle = "#03050c";
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "#88ddff";
+      ctx.font = "bold 18px monospace";
+      ctx.fillText("⚡ LOG'E", canvas.width/2-45, canvas.height/2);
+    };
+    
+    // login button event
+    document.getElementById('enterGameBtn').addEventListener('click', () => {
+      let name = runnerNameInput.value.trim();
+      if(name === "") name = "LOG'E RUNNER";
+      currentPlayerName = name;
+      logeScreen.style.display = "none";
+      startGameWithName(currentPlayerName);
+    });
+    
+    runnerNameInput.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter') document.getElementById('enterGameBtn').click();
+    });
+    
+    window.addEventListener('resize', () => {
+      if(running) {
+        resizeCanvas();
+        updateLaneCenters();
+        updateBaseY();
+        if(laneCenters.length) player.targetX = laneCenters[player.lane];
+      } else {
+        resizeCanvas();
+        updateLaneCenters();
+        updateBaseY();
+      }
+    });
+    
+    // initial setup
+    loadHighScores();
+    resizeCanvas();
+    attachSwipeControls();
+    updateLaneCenters();
+    updateBaseY();
+    // show login screen
+    logeScreen.style.display = "flex";
+    running = false;
+    ctx.fillStyle = "#03050c";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "#88ddff";
+    ctx.font = "bold 18px monospace";
+    ctx.fillText("⚡ LOG'E", canvas.width/2-45, canvas.height/2);
+  })();
+</script>
+</body>
+</html>
